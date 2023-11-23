@@ -1,3 +1,17 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const $xInput = document.querySelector('.x');
+    const $yInput = document.querySelector('.y');
+    const $result = document.querySelector('.result')
+    const $btn = document.querySelector('button');
+
+    ['mousedown', 'touchstart', 'keydown'].forEach(eventType => {
+        $btn.addEventListener(eventType, firedEvent => {
+            console.debug('executed event:', firedEvent.type)
+            $result.innerText = `RESULT: ${sum(parseInt($xInput.value), parseInt($yInput.value)).toString()}`;
+        });
+    });
+});
+
 export const wasmBrowserInstantiate = async (wasmModuleURL, importObject) => {
     let response;
 
@@ -25,20 +39,14 @@ export const wasmBrowserInstantiate = async (wasmModuleURL, importObject) => {
 }
 
 const go = new Go(); // defined in wasm_exec
+const importObject = go.importObject;
 
-const RunWasmAdd = async() => {
-    const importObject = go.importObject;
+// Instantiate the wasm module
+const wasmModule = await wasmBrowserInstantiate("./main.wasm", importObject);
 
-    // Instantiate the wasm module
-    const wasmModule = await wasmBrowserInstantiate("./main.wasm", importObject);
+// get wasm_exec to execute our wasm module
+go.run(wasmModule.instance);
 
-    // get wasm_exec to execute our wasm module
-    go.run(wasmModule.instance);
-
-    // call the function we defined in Golang and store the result
-    const addResult = wasmModule.instance.exports.add(24, 24);
-
-    document.body.textContent = `Hello World! and The result of 24 + 24 is ${addResult}`;
+function sum(x, y) {
+    return wasmModule.instance.exports.add(x, y);
 }
-
-RunWasmAdd();
