@@ -1,19 +1,5 @@
 import { go, wasmBrowserInstantiate } from "../main.js";
 
-document.addEventListener('DOMContentLoaded', () => {
-    const $xInput = document.querySelector('.x');
-    const $result = document.querySelector('.result')
-    const $resultIndexOne = document.querySelector('.result-index-one');
-    const $btn = document.querySelector('button');
-
-    ['mousedown', 'touchstart', 'keydown'].forEach(eventType => {
-        $btn.addEventListener(eventType, firedEvent => {
-            $result.innerText = `Value retrieved from Go: ${mutateAndReturnWasmMemory(parseInt($xInput.value), 0).toString()}`;
-            $resultIndexOne.innerText = `Value stored in index 1: ${readIndexOneOfBuffer()}`
-        });
-    });
-});
-
 const importObject = go.importObject;
 
 // Instantiate the wasm module
@@ -23,16 +9,19 @@ const wasmModule = await wasmBrowserInstantiate("./main.wasm", importObject);
 go.run(wasmModule.instance);
 
 // all properties exported from WASM
-const exports = wasmModule.instance.exports
+const WASM = wasmModule.instance.exports
 
 // memory from WASM
-const memory = exports.memory
+const memory = WASM.memory
 
 // new byte array to get access of WASM memory
-let wasmByteMemoryArray = new Uint8Array(memory.buffer);
+const wasmByteMemoryArray = new Uint8Array(memory.buffer);
 
 // get buffer pointer(index) that is stored inside wasm
-let graphicsBufferPointer = exports.getGraphicsBufferPointer();
+const graphicsBufferPointer = WASM.getGraphicsBufferPointer();
+
+// get size of buffer located in wasm
+const graphicsBufferSize = WASM.getGraphicsBufferSize();
 
 const $canvas = document.querySelector('canvas');
 
@@ -43,8 +32,50 @@ const canvasImageData = canvasContext.createImageData(
     $canvas.height
 );
 
-canvasContext.clearRect(0, 0, $canvas.width, $canvas.height);
+export const clearCanvas = () => canvasContext.clearRect(0, 0, $canvas.width, $canvas.height);
+
+clearCanvas()
 
 const getDarkValue = () => {
     return Math.floor(Math.random() * 100);
 }
+
+const getLightValue = () => {
+    return (Math.floor(Math.random() * 127) + 127);
+}
+
+const drawCheckerBoard = () => {
+    // const CHECHKERBOARD_SIZE = 20;
+
+    // generates a new checkerboard inside wasm
+    WASM.generateCheckerBoard(
+        getDarkValue(),
+        getDarkValue(),
+        getDarkValue(),
+        getLightValue(),
+        getLightValue(),
+        getLightValue(),
+    );
+
+    // Get RGBA from wasm memory, starts at the checkerboard pointer (memory array index)
+    const imageDataArray = wasmByteMemoryArray.slice(
+        graphicsBufferPointer,
+        graphicsBufferPointer + graphicsBufferSize
+    );
+
+    // set values to canvas image data
+    canvasImageData.data.set(imageDataArray);
+
+    clearCanvas()
+
+    // put the generated image onto canvas
+    canvasContext.putImageData(canvasImageData, 0, 0);
+
+    // 60fps - dont use if u have epilepsy
+    // window.requestAnimationFrame(drawCheckerBoard);
+}
+
+drawCheckerBoard();
+setInterval(() => {
+    drawCheckerBoard();
+}, 1000);
